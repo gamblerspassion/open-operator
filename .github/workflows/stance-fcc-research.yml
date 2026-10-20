@@ -1,21 +1,14 @@
-name: Stance FCC national extraction - isolated
+name: Stance national FCC provider H3 probe
 on:
   push:
-    branches:
-      - stance-fcc-national-research-20261020
+    branches: [stance-fcc-national-research-20261020]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  data-extract:
+  probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/stance_fcc_national_extract.py
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: stance-fcc-2025-national-provider-coverage
-          path: out/
-          retention-days: 14
+      - run: python3 scripts/stance_h3_probe.py
