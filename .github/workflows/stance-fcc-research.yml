@@ -1,0 +1,21 @@
+name: Stance FCC research - read only
+on:
+  push:
+    branches:
+      - stance-fcc-national-research-20261020
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  data-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/stance_fcc_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stance-fcc-query-verification
+          path: out/
+          retention-days: 7
