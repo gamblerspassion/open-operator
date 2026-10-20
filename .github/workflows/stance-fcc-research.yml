@@ -5,8 +5,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   extract:
+    if: ${{ !contains(github.event.head_commit.message, '[zip]') }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -23,5 +25,44 @@ jobs:
         with:
           name: stance-fcc-h3-${{ matrix.group }}
           path: out/
+          retention-days: 14
+          if-no-files-found: warn
+  zip-overlay:
+    if: ${{ contains(github.event.head_commit.message, '[zip]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for source H3 extraction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json,time,os
+          url="https://api.github.com/repos/gamblerspassion/open-operator/actions/runs/39482148088"
+          for i in range(160):
+              req=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"})
+              with urllib.request.urlopen(req,timeout=30) as resp: data=json.load(resp)
+              print("Source extraction:",data["status"],data["conclusion"],flush=True)
+              if data["status"]=="completed":
+                  if data["conclusion"]!="success": raise SystemExit("Source run did not succeed")
+                  break
+              time.sleep(20)
+          else: raise SystemExit("Timed out waiting for H3 source")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 39482148088
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: stance-fcc-h3-*
+          merge-multiple: true
+          path: downloaded/
+      - run: python3 -m pip install --disable-pip-version-check h3 shapely numpy pyshp
+      - run: python3 scripts/stance_fcc_zip_overlay.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stance-national-fcc-zip-coverage-2025
+          path: zip_results/
           retention-days: 14
           if-no-files-found: warn
