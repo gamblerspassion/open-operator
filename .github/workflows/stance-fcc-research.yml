@@ -1,4 +1,4 @@
-name: Stance FCC research - read only
+name: Stance FCC national extraction - isolated
 on:
   push:
     branches:
@@ -7,15 +7,15 @@ on:
 permissions:
   contents: read
 jobs:
-  data-test:
+  data-extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/stance_fcc_smoke.py
+      - run: python3 scripts/stance_fcc_national_extract.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: stance-fcc-query-verification
+          name: stance-fcc-2025-national-provider-coverage
           path: out/
-          retention-days: 7
+          retention-days: 14
