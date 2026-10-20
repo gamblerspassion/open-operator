@@ -1,4 +1,4 @@
-name: Stance national FCC provider H3 probe
+name: Stance nationwide FCC H3 extraction
 on:
   push:
     branches: [stance-fcc-national-research-20261020]
@@ -6,9 +6,22 @@ on:
 permissions:
   contents: read
 jobs:
-  probe:
+  extract:
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        group: [verizon, tmobile, spectrum, frontier_brightspeed, metronet_lumos, optimum_altafiber, windstream, denominators]
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/stance_h3_probe.py
+      - name: Extract FCC coverage for group
+        run: python3 scripts/stance_fcc_h3_extract.py ${{ matrix.group }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stance-fcc-h3-${{ matrix.group }}
+          path: out/
+          retention-days: 14
+          if-no-files-found: warn
