@@ -1,0 +1,108 @@
+name: Stance FCC Coverage Refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: 'ArcGIS FCC BDC FeatureServer URL (check actual vintage before running)'
+        required: true
+        type: string
+        default: 'https://services8.arcgis.com/peDZJliSvYims39Q/ArcGIS/rest/services/FCC_Broadband_Data_Collection_December_2024_View/FeatureServer'
+      providers:
+        description: 'Comma-separated provider filing names or fragments (1-24)'
+        required: true
+        type: string
+        default: 'Verizon,T-Mobile,Spectrum,Frontier,Brightspeed,Metronet,Lumos,Optimum,altafiber,Windstream'
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build requested provider matrix
+        id: plan
+        env:
+          PROVIDERS: ${{ inputs.providers }}
+        run: |
+          python3 scripts/stance_fcc_refresh_extract.py plan --providers "$PROVIDERS"
+
+  extract:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: true
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch provider or national denominator H3 coverage
+        env:
+          FCC_DATASET: ${{ inputs.dataset }}
+          PROVIDER: ${{ matrix.provider }}
+          KIND: ${{ matrix.kind }}
+          OUTPUT_ID: ${{ matrix.id }}
+        run: |
+          python3 scripts/stance_fcc_refresh_extract.py run --service-url "$FCC_DATASET" --kind "$KIND" --provider "$PROVIDER" --output-id "$OUTPUT_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stance-fcc-${{ matrix.id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: extract
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: stance-fcc-*
+          path: downloaded/
+          merge-multiple: true
+      - name: Validate provider and denominator extraction artifacts
+        run: |
+          python3 - <<'PY'
+          import glob,json
+          files=glob.glob("downloaded/*_fcc_h3.csv")
+          manifests=glob.glob("downloaded/*_manifest.json")
+          assert len(files)>=2 and len(files)==len(manifests),(files,manifests)
+          statuses=[json.load(open(p)) for p in manifests]
+          assert len([s for s in statuses if s['kind']=='denominators'])==1
+          assert all(s["rows"]>0 for s in statuses),statuses
+          print("Validated",len(statuses),"H3 extraction groups")
+          PY
+      - name: Install geographic processing libraries
+        run: python3 -m pip install --disable-pip-version-check 'h3>=4,<5' 'shapely>=2,<3' 'numpy>=1.26,<3' 'pyshp>=2.3,<3'
+      - name: Map H3 coverage to Census ZIP areas
+        run: python3 scripts/stance_fcc_refresh_overlay.py
+      - name: Produce ZIP, city, county and state coverage
+        run: python3 scripts/stance_fcc_refresh_summaries.py
+      - name: Package all geographic results
+        run: |
+          mkdir -p deliverables
+          cp coverage_results/* deliverables/
+          cp zip_results/national_provider_technology_zcta_estimates.csv deliverables/coverage_zip_raw.csv
+          cp zip_results/zip_h3_denominators.csv deliverables/
+          cp zip_results/methodology.json deliverables/
+          python3 - <<'PY'
+          import json,os
+          meta={"source_dataset":os.environ["FCC_DATASET"],"requested_providers":os.environ["PROVIDERS"],"run_id":os.environ["GITHUB_RUN_ID"]}
+          with open("deliverables/run_inputs.json","w") as f:json.dump(meta,f,indent=2)
+          PY
+        env:
+          FCC_DATASET: ${{ inputs.dataset }}
+          PROVIDERS: ${{ inputs.providers }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stance-fcc-coverage-zip-city-county-state
+          path: deliverables/
+          if-no-files-found: error
+          retention-days: 30
