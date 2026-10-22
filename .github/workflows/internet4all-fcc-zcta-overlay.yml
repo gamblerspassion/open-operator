@@ -1,4 +1,5 @@
 name: Internet4ALL all-provider ZIP coverage overlay
+# Retry after SQLite six-column provider table fix; uses completed source run.
 on:
   push:
     branches: [internet4all-national-fcc-20261022]
