@@ -1,0 +1,27 @@
+name: Internet 4 ALL — all-provider H3 national extract
+on:
+  push:
+    branches: [internet4all-national-fcc-20261022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  h3:
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract complete all-provider FCC H3 records
+        run: python3 scripts/internet4all_fcc_h3_all.py --shard ${{ matrix.shard }} --shards 24
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: internet4all-fcc-h3-all-${{ matrix.shard }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: warn
