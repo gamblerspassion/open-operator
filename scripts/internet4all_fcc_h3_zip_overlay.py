@@ -82,7 +82,7 @@ for file in files:
     db.executemany("INSERT INTO providers VALUES(?,?,?,?,?,?) ON CONFLICT(geoid,provider,frn,tech) DO UPDATE SET total=MAX(total,excluded.total), served=MAX(served,excluded.served)",rows)
     pcount+=len(rows);rows=[]
   if rows:
-   db.executemany("INSERT INTO providers VALUES(?,?,?,?,?) ON CONFLICT(geoid,provider,tech) DO UPDATE SET total=MAX(total,excluded.total), served=MAX(served,excluded.served)",rows)
+   db.executemany("INSERT INTO providers VALUES(?,?,?,?,?,?) ON CONFLICT(geoid,provider,frn,tech) DO UPDATE SET total=MAX(total,excluded.total), served=MAX(served,excluded.served)",rows)
    pcount+=len(rows)
  db.commit();print("INGESTED",file.name,pcount,flush=True)
 db.execute("CREATE INDEX idx_provider_geoid ON providers(geoid)")
