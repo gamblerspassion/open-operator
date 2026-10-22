@@ -1,0 +1,26 @@
+name: Internet 4 ALL — proven FCC extraction
+on:
+  push:
+    branches: [internet4all-national-fcc-20261022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  extract:
+    strategy:
+      fail-fast: false
+      matrix:
+        level: [state, county]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all FCC provider records via verified Esri FeatureServer
+        run: python3 scripts/internet4all_fcc_all_providers.py --level ${{ matrix.level }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: internet4all-fcc-all-providers-${{ matrix.level }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: warn
