@@ -1,0 +1,41 @@
+name: Internet4ALL all-provider ZIP coverage overlay
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Successful 24-shard national H3 run ID"
+        required: true
+        default: "39843922660"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  zcta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download nationwide all-provider H3 shards
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: internet4all-h3-shard-*
+          merge-multiple: true
+          path: downloaded/
+      - name: Download proven H3 serviceable-location denominators
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 39482148088
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: stance-fcc-h3-denominators
+          path: downloaded/
+      - run: python3 -m pip install --disable-pip-version-check h3 shapely numpy pyshp
+      - run: python3 scripts/internet4all_fcc_h3_zip_overlay.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: internet4all-national-all-provider-zcta
+          path: zip_results/
+          retention-days: 30
+          if-no-files-found: warn
