@@ -52,7 +52,8 @@ jobs:
           name: stance-fcc-h3-denominators
           path: downloaded/
       - run: python3 -m pip install --disable-pip-version-check h3 shapely numpy pyshp
-      - run: python3 scripts/internet4all_fcc_h3_zip_overlay.py
+      - name: Merge all provider H3 records into Census ZCTA coverage
+        run: python3 scripts/internet4all_fcc_h3_zip_overlay.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
